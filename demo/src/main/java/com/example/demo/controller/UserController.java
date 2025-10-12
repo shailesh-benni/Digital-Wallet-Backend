@@ -48,8 +48,18 @@ public class UserController {
         if (user == null) return ResponseEntity.status(401).body("Unauthorized");
 
         Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
-        return ResponseEntity.ok(new UserInfoResponse(user.getName(), user.getEmail(), wallet.getBalance()));
+        List<Transaction> transactions = transactionRepository.findByUserOrderByCreatedAtDesc(user);
+
+        Map<String, Object> response = Map.of(
+                "name", user.getName(),
+                "email", user.getEmail(),
+                "balance", wallet.getBalance(),
+                "transactions", transactions
+        );
+
+        return ResponseEntity.ok(response);
     }
+
 
 
     @GetMapping("/me/balance")
@@ -67,10 +77,29 @@ public class UserController {
         User user = getUserFromToken(authHeader);
         if (user == null) return ResponseEntity.status(401).body("Unauthorized");
 
-        List<Transaction> transactions = transactionRepository.findByUser(user);
+        List<Transaction> transactions = transactionRepository.findByUserOrderByCreatedAtDesc(user);
+
         return ResponseEntity.ok(transactions);
     }
 
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllUsers(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
+        User currentUser = getUserFromToken(authHeader);
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        List<User> users = userRepository.findAll();
+        // Exclude current user
+        users.removeIf(u -> u.getId().equals(currentUser.getId()));
+
+        List<Map<String, Object>> response = users.stream()
+                .map(u -> Map.<String, Object>of(
+                        "id", u.getId(),
+                        "name", u.getName()
+                ))
+                .toList(); // ✅ works only on Java 16+
+
+        return ResponseEntity.ok(response);
+    }
 
     @PostMapping("/transfer")
     public ResponseEntity<?> transferAmount(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
@@ -123,5 +152,7 @@ public class UserController {
                 "balance", wallet.getBalance()
         ));
     }
+
+
 
 }
