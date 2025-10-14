@@ -1,8 +1,8 @@
 package com.example.demo.controller;
 
-import com.example.demo.config.JwtUtil;
+import com.example.demo.service.UserService;
+import com.example.demo.util.JwtUtil;
 import com.example.demo.dto.TransferRequest;
-import com.example.demo.dto.UserInfoResponse;
 import com.example.demo.model.Transaction;
 import com.example.demo.model.User;
 import com.example.demo.model.Wallet;
@@ -16,143 +16,59 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private WalletRepository walletRepository;
-
-    @Autowired
-    private TransactionRepository transactionRepository;
+    private UserService userService;
 
     @Autowired
     private JwtUtil jwtUtil;
 
-
-    private User getUserFromToken(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) return null;
-        String token = authHeader.substring(7);
-        if (!jwtUtil.validateToken(token)) return null;
-        String email = jwtUtil.getEmailFromToken(token);
-        return userRepository.findByEmail(email).orElse(null);
-    }
-
     @GetMapping("/me")
     public ResponseEntity<?> getMyInfo(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
-        User user = getUserFromToken(authHeader);
+        User user = userService.getUserFromToken(authHeader);
         if (user == null) return ResponseEntity.status(401).body("Unauthorized");
-
-        Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
-        List<Transaction> transactions = transactionRepository.findByUserOrderByCreatedAtDesc(user);
-
-        Map<String, Object> response = Map.of(
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "balance", wallet.getBalance(),
-                "transactions", transactions
-        );
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(userService.getMyInfo(user));
     }
-
-
 
     @GetMapping("/me/balance")
     public ResponseEntity<?> getMyBalance(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
-        User user = getUserFromToken(authHeader);
+        User user = userService.getUserFromToken(authHeader);
         if (user == null) return ResponseEntity.status(401).body("Unauthorized");
-
-        Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
-        return ResponseEntity.ok(Map.of("balance", wallet.getBalance()));
+        return ResponseEntity.ok(userService.getMyBalance(user));
     }
-
 
     @GetMapping("/me/transactions")
     public ResponseEntity<?> getMyTransactions(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
-        User user = getUserFromToken(authHeader);
+        User user = userService.getUserFromToken(authHeader);
         if (user == null) return ResponseEntity.status(401).body("Unauthorized");
-
-        List<Transaction> transactions = transactionRepository.findByUserOrderByCreatedAtDesc(user);
-
-        return ResponseEntity.ok(transactions);
+        return ResponseEntity.ok(userService.getMyTransactions(user));
     }
 
     @GetMapping("/all")
     public ResponseEntity<?> getAllUsers(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader) {
-        User currentUser = getUserFromToken(authHeader);
-        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
-
-        List<User> users = userRepository.findAll();
-        // Exclude current user
-        users.removeIf(u -> u.getId().equals(currentUser.getId()));
-
-        List<Map<String, Object>> response = users.stream()
-                .map(u -> Map.<String, Object>of(
-                        "id", u.getId(),
-                        "name", u.getName()
-                ))
-                .toList(); // ✅ works only on Java 16+
-
-        return ResponseEntity.ok(response);
+        User user = userService.getUserFromToken(authHeader);
+        if (user == null) return ResponseEntity.status(401).body("Unauthorized");
+        return ResponseEntity.ok(userService.getAllUsers(user));
     }
 
     @PostMapping("/transfer")
     public ResponseEntity<?> transferAmount(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
                                             @RequestBody TransferRequest request) {
-        User sender = getUserFromToken(authHeader);
+        User sender = userService.getUserFromToken(authHeader);
         if (sender == null) return ResponseEntity.status(401).body("Unauthorized");
-
-        User receiver = userRepository.findById(request.getReceiverId()).orElse(null);
-        if (receiver == null) return ResponseEntity.badRequest().body("Receiver not found");
-
-        Wallet senderWallet = walletRepository.findByUser(sender).orElse(new Wallet(sender));
-        Wallet receiverWallet = walletRepository.findByUser(receiver).orElse(new Wallet(receiver));
-
-        if (senderWallet.getBalance() < request.getAmount())
-            return ResponseEntity.badRequest().body("Insufficient balance");
-
-
-        senderWallet.setBalance(senderWallet.getBalance() - request.getAmount());
-        receiverWallet.setBalance(receiverWallet.getBalance() + request.getAmount());
-
-        walletRepository.save(senderWallet);
-        walletRepository.save(receiverWallet);
-
-
-        transactionRepository.save(new Transaction(sender, -request.getAmount(), "DEBIT"));
-        transactionRepository.save(new Transaction(receiver, request.getAmount(), "CREDIT"));
-
-        return ResponseEntity.ok(Map.of("message", "Transfer successful", "balance", senderWallet.getBalance()));
+        return ResponseEntity.ok(userService.transferAmount(sender, request));
     }
-
 
     @PostMapping("/me/load")
     public ResponseEntity<?> loadMoney(@RequestHeader(HttpHeaders.AUTHORIZATION) String authHeader,
                                        @RequestBody Map<String, Double> request) {
-        if (!request.containsKey("amount") || request.get("amount") <= 0)
-            return ResponseEntity.badRequest().body("Amount must be > 0");
-
-        double amount = request.get("amount");
-        User user = getUserFromToken(authHeader);
+        User user = userService.getUserFromToken(authHeader);
         if (user == null) return ResponseEntity.status(401).body("Unauthorized");
 
-        Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
-        wallet.setBalance(wallet.getBalance() + amount);
-        walletRepository.save(wallet);
-
-        transactionRepository.save(new Transaction(user, amount, "SELF_CREDITED"));
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Wallet loaded successfully",
-                "balance", wallet.getBalance()
-        ));
+        double amount = request.getOrDefault("amount", 0.0);
+        return ResponseEntity.ok(userService.loadMoney(user, amount));
     }
-
-
-
 }

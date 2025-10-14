@@ -1,7 +1,7 @@
 
 package com.example.demo;
 
-import com.example.demo.config.JwtUtil;
+import com.example.demo.util.JwtUtil;
 import com.example.demo.model.User;
 import com.example.demo.model.Wallet;
 import com.example.demo.repository.UserRepository;

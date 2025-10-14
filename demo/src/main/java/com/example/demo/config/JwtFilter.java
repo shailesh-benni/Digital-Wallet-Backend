@@ -2,6 +2,7 @@ package com.example.demo.config;
 
 import com.example.demo.model.User;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,8 +34,13 @@ public class JwtFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
 
-        // ✅ Skip JWT validation for auth endpoints and preflight (OPTIONS) requests
-        if (path.startsWith("/api/auth") || "OPTIONS".equalsIgnoreCase(request.getMethod())) {
+        // Skip JWT validation for auth endpoints, Swagger, and OPTIONS requests
+        if (path.startsWith("/api/auth") ||
+                path.startsWith("/v3/api-docs") ||
+                path.startsWith("/swagger-ui") ||
+                path.equals("/swagger-ui.html") ||
+                "OPTIONS".equalsIgnoreCase(request.getMethod())) {
+
             filterChain.doFilter(request, response);
             return;
         }
@@ -53,7 +59,7 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
-        // ✅ Set authenticated user in SecurityContext
+        // Set authenticated user in SecurityContext
         String email = jwtUtil.getEmailFromToken(token);
         User user = userRepository.findByEmail(email).orElse(null);
 
