@@ -1,5 +1,7 @@
 package com.example.demo.service;
 
+import com.example.demo.dto.*;
+import com.example.demo.mapper.UserMapper;
 import com.example.demo.model.User;
 import com.example.demo.model.Wallet;
 import com.example.demo.repository.UserRepository;
@@ -9,8 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.Period;
 
 @Service
 public class AuthService {
@@ -24,45 +26,59 @@ public class AuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
-    private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public Map<String, Object> signup(User user) {
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+    // ✅ Signup using DTOs
+    public SignupResponse signup(SignupRequest request) {
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new RuntimeException("Email already exists!");
         }
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        if (request.getDateOfBirth() == null) {
+            throw new RuntimeException("Date of Birth is required!");
+        }
+
+        int age = Period.between(request.getDateOfBirth(), LocalDate.now()).getYears();
+        if (age < 18) {
+            throw new RuntimeException("Younger than 18 — Account cannot be created.");
+        }
+
+        // Map Request DTO → Entity
+        User user = UserMapper.toEntity(request);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
         User savedUser = userRepository.save(user);
 
+        // Create wallet for new user
         Wallet wallet = new Wallet(savedUser);
         walletRepository.save(wallet);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "User registered successfully!");
-        response.put("name", savedUser.getName());
-        response.put("email", savedUser.getEmail());
-        response.put("balance", wallet.getBalance());
-
-        return response;
+        // Map Entity → Response DTO
+        return new SignupResponse(
+                "User registered successfully!",
+                savedUser.getName(),
+                savedUser.getEmail(),
+                age,
+                wallet.getBalance()
+        );
     }
 
-    public Map<String, Object> login(String email, String password) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Invalid credentials"));
+    public LoginResponse login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid credentials");
         }
 
         Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
         String token = jwtUtil.generateToken(user.getEmail());
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Login successful!");
-        response.put("token", token);
-        response.put("name", user.getName());
-        response.put("email", user.getEmail());
-        response.put("balance", wallet.getBalance());
-
-        return response;
+        return new LoginResponse(
+                "Login successful!",
+                token,
+                user.getName(),
+                user.getEmail(),
+                wallet.getBalance()
+        );
     }
 }

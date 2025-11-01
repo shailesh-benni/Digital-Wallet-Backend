@@ -1,18 +1,11 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.*;
 import com.example.demo.service.AuthService;
-import com.example.demo.util.JwtUtil;
-import com.example.demo.model.User;
-import com.example.demo.model.Wallet;
-import com.example.demo.repository.UserRepository;
-import com.example.demo.repository.WalletRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-import java.util.HashMap;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -20,19 +13,23 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    // ✅ Signup endpoint
     @PostMapping("/signup")
-    public ResponseEntity<?> signup(@RequestBody User user) {
+    public ResponseEntity<?> signup(@RequestBody SignupRequest request) {
         try {
-            return ResponseEntity.ok(authService.signup(user));
+            SignupResponse response = authService.signup(request);
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
+    // ✅ Login endpoint
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            return ResponseEntity.ok(authService.login(credentials.get("email"), credentials.get("password")));
+            LoginResponse response = authService.login(request);
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             return ResponseEntity.status(401).body(e.getMessage());
         }

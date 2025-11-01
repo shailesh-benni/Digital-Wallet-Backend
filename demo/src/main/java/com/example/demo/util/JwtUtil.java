@@ -30,8 +30,6 @@ public class JwtUtil {
             return false;
         }
     }
-
-    // Get email from token
     public String getEmailFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(key)
