@@ -17,7 +17,6 @@ public class TransactionResponse {
         this.relatedUserName = relatedUserName;
     }
 
-    // Getters
     public Long getId() { return id; }
     public double getAmount() { return amount; }
     public String getType() { return type; }

@@ -66,7 +66,6 @@ public class UserService {
         return new WalletBalanceResponseDTO(wallet.getBalance());
     }
 
-    // --- ✅ My Transactions ---
     public List<TransactionResponse> getMyTransactions(User user) {
         return transactionRepository.findByUserOrderByCreatedAtDesc(user)
                 .stream()
