@@ -43,16 +43,14 @@ public class AuthService {
             throw new RuntimeException("Younger than 18 — Account cannot be created.");
         }
 
-        // Map Request DTO → Entity
         User user = UserMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         User savedUser = userRepository.save(user);
 
-        // Create wallet for new user
-        Wallet wallet = new Wallet(savedUser);
+        // ✅ Create default wallet "Primary"
+        Wallet wallet = new Wallet(savedUser, "Primary");
         walletRepository.save(wallet);
 
-        // Map Entity → Response DTO
         return new SignupResponse(
                 "User registered successfully!",
                 savedUser.getName(),
@@ -70,7 +68,9 @@ public class AuthService {
             throw new RuntimeException("Invalid credentials");
         }
 
-        Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
+        Wallet wallet = walletRepository.findTopByUserOrderByIdAsc(user)
+                .orElseGet(() -> walletRepository.save(new Wallet(user, "Primary")));
+
         String token = jwtUtil.generateToken(user.getEmail());
 
         return new LoginResponse(

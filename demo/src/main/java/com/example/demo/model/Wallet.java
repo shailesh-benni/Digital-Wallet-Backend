@@ -1,31 +1,41 @@
 package com.example.demo.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
 public class Wallet {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Double balance;
+    private String walletName;
+
+    private Double balance = 0.0;
 
     @Version
     private Long version;
 
-    @OneToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private User user;
 
     public Wallet() {}
 
-    public Wallet(User user) {
+    public Wallet(User user, String walletName) {
         this.user = user;
+        this.walletName = walletName;
         this.balance = 0.0;
     }
 
-    // getters & setters
+    // Getters & Setters
     public Long getId() { return id; }
+
+    public String getWalletName() { return walletName; }
+    public void setWalletName(String walletName) { this.walletName = walletName; }
+
     public Double getBalance() { return balance; }
     public void setBalance(Double balance) { this.balance = balance; }
 

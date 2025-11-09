@@ -1,7 +1,6 @@
 package com.example.demo.service;
 
 import com.example.demo.dto.*;
-import com.example.demo.dto.TransactionResponse;
 import com.example.demo.mapper.TransactionMapper;
 import com.example.demo.mapper.UserMapper;
 import com.example.demo.model.Transaction;
@@ -31,7 +30,7 @@ public class UserService {
     @Autowired
     private JwtUtil jwtUtil;
 
-    // --- ✅ Extract user from token ---
+    // ✅ Extract user from JWT token
     public User getUserFromToken(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) return null;
         String token = authHeader.substring(7);
@@ -41,11 +40,14 @@ public class UserService {
         return userRepository.findByEmail(email).orElse(null);
     }
 
-    // --- ✅ My Info (user + wallet + transactions) ---
+    // ✅ My Info — returns user + primary wallet + transactions
     public UserProfileResponseDTO getMyInfo(User user) {
-        Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
-        List<Transaction> transactions = transactionRepository.findByUserOrderByCreatedAtDesc(user);
+        // Fetch primary wallet or create if missing
+        Wallet wallet = walletRepository.findTopByUserOrderByIdAsc(user)
+                .orElseGet(() -> walletRepository.save(new Wallet(user, "Primary")));
 
+        // Fetch transactions
+        List<Transaction> transactions = transactionRepository.findByUserOrderByCreatedAtDesc(user);
         List<TransactionResponse> txList = transactions.stream()
                 .map(TransactionMapper::toDTO)
                 .toList();
@@ -60,12 +62,14 @@ public class UserService {
         );
     }
 
-    // --- ✅ My Balance ---
+    // ✅ My Balance (primary wallet)
     public WalletBalanceResponseDTO getMyBalance(User user) {
-        Wallet wallet = walletRepository.findByUser(user).orElse(new Wallet(user));
+        Wallet wallet = walletRepository.findTopByUserOrderByIdAsc(user)
+                .orElseGet(() -> walletRepository.save(new Wallet(user, "Primary")));
         return new WalletBalanceResponseDTO(wallet.getBalance());
     }
 
+    // ✅ My Transactions
     public List<TransactionResponse> getMyTransactions(User user) {
         return transactionRepository.findByUserOrderByCreatedAtDesc(user)
                 .stream()
@@ -73,7 +77,7 @@ public class UserService {
                 .toList();
     }
 
-    // --- ✅ Get all users except current ---
+    // ✅ Get all users except current
     public List<UserSummaryDTO> getAllUsers(User currentUser) {
         return userRepository.findAll().stream()
                 .filter(u -> !u.getId().equals(currentUser.getId()))
